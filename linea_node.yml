@@ -1,0 +1,86 @@
+---
+- name: Manage a Linea testnet node
+  hosts: localhost
+  become: true
+  vars_prompt:
+    - name: node_action
+      prompt: "Enter the action to perform (install, remove)"
+      private: false
+  vars:
+    working_directory: "{{ ansible_env.HOME }}/linea_data"
+    genesis_file_url: "https://docs.linea.build/files/genesis.json"
+    linea_service_template: "linea-node.service.j2"
+    linea_service_name: "linea-node.service"
+
+  tasks:
+    - name: Install system dependencies
+      ansible.builtin.apt:
+        name:
+          - software-properties-common
+          - screen
+        state: present
+      when: node_action == "install"
+
+    - name: Create Linea data directory
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/linea_data"
+        state: directory
+        mode: '0755'
+      when: node_action == "install"
+      
+    - name: Add Ethereum PPA and install ethereum
+      block:
+        - ansible.builtin.apt_repository:
+            repo: ppa:ethereum/ethereum
+            state: present
+        - ansible.builtin.apt:
+            update_cache: yes
+        - ansible.builtin.apt:
+            name: ethereum
+            state: present
+      when: node_action == "install"
+
+    - name: Download genesis.json file
+      ansible.builtin.get_url:
+        url: "{{ genesis_file_url }}"
+        dest: "{{ working_directory }}/genesis.json"
+      when: node_action == "install"
+
+    - name: Initialize Linea blockchain data
+      ansible.builtin.command:
+        cmd: geth --datadir {{ working_directory }} init {{ working_directory }}/genesis.json
+      when: node_action == "install"
+
+    - name: Create Linea node service template
+      ansible.builtin.template:
+        src: "{{ linea_service_template }}"
+        dest: "/etc/systemd/system/{{ linea_service_name }}"
+      when: node_action == "install"
+
+    - name: Reload systemd manager configuration
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: node_action == "install"
+
+    - name: Enable Linea node service
+      ansible.builtin.systemd:
+        name: "{{ linea_service_name }}"
+        enabled: true
+        state: stopped
+      when: node_action == "install"
+
+    - name: Remove Linea node
+      block:
+        - name: Stop and disable Linea node service
+          ansible.builtin.systemd:
+            name: "{{ linea_service_name }}"
+            state: stopped
+            enabled: false
+        - name: Remove Linea data directory and configurations
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ working_directory }}"
+            - "/etc/systemd/system/{{ linea_service_name }}"
+      when: node_action == "remove"
