@@ -8,7 +8,7 @@
       private: false
   vars:
     working_directory: "{{ ansible_env.HOME }}/linea_data"
-    genesis_file_url: "https://docs.linea.build/files/genesis.json"
+    genesis_file_url: "https://docs.linea.build/files/geth/mainnet/genesis.json"
     linea_service_template: "linea-node.service.j2"
     linea_service_name: "linea-node.service"
 
