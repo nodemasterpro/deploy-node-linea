@@ -27,17 +27,27 @@
         state: directory
         mode: '0755'
       when: node_action == "install"
-      
-    - name: Add Ethereum PPA and install ethereum
+
+    - name: Remove existing Geth if installed
+      ansible.builtin.apt:
+        name: geth
+        state: absent
+      when: node_action == "install"
+
+    - name: Download and install Geth 1.13.x
       block:
-        - ansible.builtin.apt_repository:
-            repo: ppa:ethereum/ethereum
-            state: present
-        - ansible.builtin.apt:
-            update_cache: yes
-        - ansible.builtin.apt:
-            name: ethereum
-            state: present
+        - name: Download Geth
+          ansible.builtin.get_url:
+            url: "https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.13.15-c5ba367e.tar.gz"
+            dest: "/tmp/geth-linux-amd64-1.13.15-c5ba367e.tar.gz"
+        - name: Extract Geth
+          ansible.builtin.unarchive:
+            src: "/tmp/geth-linux-amd64-1.13.15-c5ba367e.tar.gz"
+            dest: "/tmp/"
+            remote_src: yes
+        - name: Move Geth binary
+          ansible.builtin.command:
+            cmd: mv /tmp/geth-linux-amd64-1.13.15-c5ba367e/geth /usr/bin/geth
       when: node_action == "install"
 
     - name: Download genesis.json file
